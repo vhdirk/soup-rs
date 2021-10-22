@@ -2,6 +2,9 @@
 work_mode = "sys"
 library = "Soup"
 version = "2.4"
+girs_directories = [ "../gir-files/" ]
+target_path = "."
+min_cfg_version = "2.24"
 external_libraries = [
    "GLib",
    "GObject",

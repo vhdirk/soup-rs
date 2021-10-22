@@ -2,17 +2,17 @@
 // from gir-files (https://github.com/gtk-rs/gir-files @ 3043b14)
 // DO NOT EDIT
 
-extern crate soup_sys;
 extern crate shell_words;
+extern crate soup_sys;
 extern crate tempfile;
+use soup_sys::*;
 use std::env;
 use std::error::Error;
-use std::path::Path;
 use std::mem::{align_of, size_of};
+use std::path::Path;
 use std::process::Command;
 use std::str;
 use tempfile::Builder;
-use soup_sys::*;
 
 static PACKAGES: &[&str] = &["libsoup-2.4"];
 
@@ -48,8 +48,7 @@ impl Compiler {
         cmd.arg(out);
         let status = cmd.spawn()?.wait()?;
         if !status.success() {
-            return Err(format!("compilation command {:?} failed, {}",
-                               &cmd, status).into());
+            return Err(format!("compilation command {:?} failed, {}", &cmd, status).into());
         }
         Ok(())
     }
@@ -78,13 +77,11 @@ fn pkg_config_cflags(packages: &[&str]) -> Result<Vec<String>, Box<dyn Error>> {
     cmd.args(packages);
     let out = cmd.output()?;
     if !out.status.success() {
-        return Err(format!("command {:?} returned {}",
-                           &cmd, out.status).into());
+        return Err(format!("command {:?} returned {}", &cmd, out.status).into());
     }
     let stdout = str::from_utf8(&out.stdout)?;
     Ok(shell_words::split(stdout.trim())?)
 }
-
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct Layout {
@@ -116,9 +113,8 @@ impl Results {
     fn summary(&self) -> String {
         format!(
             "{} passed; {} failed (compilation errors: {})",
-            self.passed,
-            self.failed,
-            self.failed_to_compile)
+            self.passed, self.failed, self.failed_to_compile
+        )
     }
     fn expect_total_success(&self) {
         if self.failed == 0 {
@@ -131,27 +127,34 @@ impl Results {
 
 #[test]
 fn cross_validate_constants_with_c() {
-    let tmpdir = Builder::new().prefix("abi").tempdir().expect("temporary directory");
+    let tmpdir = Builder::new()
+        .prefix("abi")
+        .tempdir()
+        .expect("temporary directory");
     let cc = Compiler::new().expect("configured compiler");
 
-    assert_eq!("1",
-               get_c_value(tmpdir.path(), &cc, "1").expect("C constant"),
-               "failed to obtain correct constant value for 1");
+    assert_eq!(
+        "1",
+        get_c_value(tmpdir.path(), &cc, "1").expect("C constant"),
+        "failed to obtain correct constant value for 1"
+    );
 
-    let mut results : Results = Default::default();
+    let mut results: Results = Default::default();
     for (i, &(name, rust_value)) in RUST_CONSTANTS.iter().enumerate() {
         match get_c_value(tmpdir.path(), &cc, name) {
             Err(e) => {
                 results.record_failed_to_compile();
                 eprintln!("{}", e);
-            },
+            }
             Ok(ref c_value) => {
                 if rust_value == c_value {
                     results.record_passed();
                 } else {
                     results.record_failed();
-                    eprintln!("Constant value mismatch for {}\nRust: {:?}\nC:    {:?}",
-                              name, rust_value, c_value);
+                    eprintln!(
+                        "Constant value mismatch for {}\nRust: {:?}\nC:    {:?}",
+                        name, rust_value, c_value
+                    );
                 }
             }
         };
@@ -164,27 +167,37 @@ fn cross_validate_constants_with_c() {
 
 #[test]
 fn cross_validate_layout_with_c() {
-    let tmpdir = Builder::new().prefix("abi").tempdir().expect("temporary directory");
+    let tmpdir = Builder::new()
+        .prefix("abi")
+        .tempdir()
+        .expect("temporary directory");
     let cc = Compiler::new().expect("configured compiler");
 
-    assert_eq!(Layout {size: 1, alignment: 1},
-               get_c_layout(tmpdir.path(), &cc, "char").expect("C layout"),
-               "failed to obtain correct layout for char type");
+    assert_eq!(
+        Layout {
+            size: 1,
+            alignment: 1
+        },
+        get_c_layout(tmpdir.path(), &cc, "char").expect("C layout"),
+        "failed to obtain correct layout for char type"
+    );
 
-    let mut results : Results = Default::default();
+    let mut results: Results = Default::default();
     for (i, &(name, rust_layout)) in RUST_LAYOUTS.iter().enumerate() {
         match get_c_layout(tmpdir.path(), &cc, name) {
             Err(e) => {
                 results.record_failed_to_compile();
                 eprintln!("{}", e);
-            },
+            }
             Ok(c_layout) => {
                 if rust_layout == c_layout {
                     results.record_passed();
                 } else {
                     results.record_failed();
-                    eprintln!("Layout mismatch for {}\nRust: {:?}\nC:    {:?}",
-                              name, rust_layout, &c_layout);
+                    eprintln!(
+                        "Layout mismatch for {}\nRust: {:?}\nC:    {:?}",
+                        name, rust_layout, &c_layout
+                    );
                 }
             }
         };
@@ -204,15 +217,14 @@ fn get_c_layout(dir: &Path, cc: &Compiler, name: &str) -> Result<Layout, Box<dyn
     let mut abi_cmd = Command::new(exe);
     let output = abi_cmd.output()?;
     if !output.status.success() {
-        return Err(format!("command {:?} failed, {:?}",
-                           &abi_cmd, &output).into());
+        return Err(format!("command {:?} failed, {:?}", &abi_cmd, &output).into());
     }
 
     let stdout = str::from_utf8(&output.stdout)?;
     let mut words = stdout.trim().split_whitespace();
     let size = words.next().unwrap().parse().unwrap();
     let alignment = words.next().unwrap().parse().unwrap();
-    Ok(Layout {size, alignment})
+    Ok(Layout { size, alignment })
 }
 
 fn get_c_value(dir: &Path, cc: &Compiler, name: &str) -> Result<String, Box<dyn Error>> {
@@ -224,127 +236,764 @@ fn get_c_value(dir: &Path, cc: &Compiler, name: &str) -> Result<String, Box<dyn 
     let mut abi_cmd = Command::new(exe);
     let output = abi_cmd.output()?;
     if !output.status.success() {
-        return Err(format!("command {:?} failed, {:?}",
-                           &abi_cmd, &output).into());
+        return Err(format!("command {:?} failed, {:?}", &abi_cmd, &output).into());
     }
 
     let output = str::from_utf8(&output.stdout)?.trim();
-    if !output.starts_with("###gir test###") ||
-       !output.ends_with("###gir test###") {
-        return Err(format!("command {:?} return invalid output, {:?}",
-                           &abi_cmd, &output).into());
+    if !output.starts_with("###gir test###") || !output.ends_with("###gir test###") {
+        return Err(format!(
+            "command {:?} return invalid output, {:?}",
+            &abi_cmd, &output
+        )
+        .into());
     }
 
     Ok(String::from(&output[14..(output.len() - 14)]))
 }
 
 const RUST_LAYOUTS: &[(&str, Layout)] = &[
-    ("SoupAddress", Layout {size: size_of::<SoupAddress>(), alignment: align_of::<SoupAddress>()}),
-    ("SoupAddressClass", Layout {size: size_of::<SoupAddressClass>(), alignment: align_of::<SoupAddressClass>()}),
-    ("SoupAddressFamily", Layout {size: size_of::<SoupAddressFamily>(), alignment: align_of::<SoupAddressFamily>()}),
-    ("SoupAuth", Layout {size: size_of::<SoupAuth>(), alignment: align_of::<SoupAuth>()}),
-    ("SoupAuthClass", Layout {size: size_of::<SoupAuthClass>(), alignment: align_of::<SoupAuthClass>()}),
-    ("SoupAuthDomain", Layout {size: size_of::<SoupAuthDomain>(), alignment: align_of::<SoupAuthDomain>()}),
-    ("SoupAuthDomainBasic", Layout {size: size_of::<SoupAuthDomainBasic>(), alignment: align_of::<SoupAuthDomainBasic>()}),
-    ("SoupAuthDomainBasicClass", Layout {size: size_of::<SoupAuthDomainBasicClass>(), alignment: align_of::<SoupAuthDomainBasicClass>()}),
-    ("SoupAuthDomainClass", Layout {size: size_of::<SoupAuthDomainClass>(), alignment: align_of::<SoupAuthDomainClass>()}),
-    ("SoupAuthDomainDigest", Layout {size: size_of::<SoupAuthDomainDigest>(), alignment: align_of::<SoupAuthDomainDigest>()}),
-    ("SoupAuthDomainDigestClass", Layout {size: size_of::<SoupAuthDomainDigestClass>(), alignment: align_of::<SoupAuthDomainDigestClass>()}),
-    ("SoupAuthManager", Layout {size: size_of::<SoupAuthManager>(), alignment: align_of::<SoupAuthManager>()}),
-    ("SoupAuthManagerClass", Layout {size: size_of::<SoupAuthManagerClass>(), alignment: align_of::<SoupAuthManagerClass>()}),
-    ("SoupBuffer", Layout {size: size_of::<SoupBuffer>(), alignment: align_of::<SoupBuffer>()}),
-    ("SoupCache", Layout {size: size_of::<SoupCache>(), alignment: align_of::<SoupCache>()}),
-    ("SoupCacheClass", Layout {size: size_of::<SoupCacheClass>(), alignment: align_of::<SoupCacheClass>()}),
-    ("SoupCacheResponse", Layout {size: size_of::<SoupCacheResponse>(), alignment: align_of::<SoupCacheResponse>()}),
-    ("SoupCacheType", Layout {size: size_of::<SoupCacheType>(), alignment: align_of::<SoupCacheType>()}),
-    ("SoupCacheability", Layout {size: size_of::<SoupCacheability>(), alignment: align_of::<SoupCacheability>()}),
-    ("SoupConnectionState", Layout {size: size_of::<SoupConnectionState>(), alignment: align_of::<SoupConnectionState>()}),
-    ("SoupContentDecoder", Layout {size: size_of::<SoupContentDecoder>(), alignment: align_of::<SoupContentDecoder>()}),
-    ("SoupContentDecoderClass", Layout {size: size_of::<SoupContentDecoderClass>(), alignment: align_of::<SoupContentDecoderClass>()}),
-    ("SoupContentSniffer", Layout {size: size_of::<SoupContentSniffer>(), alignment: align_of::<SoupContentSniffer>()}),
-    ("SoupContentSnifferClass", Layout {size: size_of::<SoupContentSnifferClass>(), alignment: align_of::<SoupContentSnifferClass>()}),
-    ("SoupCookie", Layout {size: size_of::<SoupCookie>(), alignment: align_of::<SoupCookie>()}),
-    ("SoupCookieJar", Layout {size: size_of::<SoupCookieJar>(), alignment: align_of::<SoupCookieJar>()}),
-    ("SoupCookieJarAcceptPolicy", Layout {size: size_of::<SoupCookieJarAcceptPolicy>(), alignment: align_of::<SoupCookieJarAcceptPolicy>()}),
-    ("SoupCookieJarClass", Layout {size: size_of::<SoupCookieJarClass>(), alignment: align_of::<SoupCookieJarClass>()}),
-    ("SoupCookieJarDB", Layout {size: size_of::<SoupCookieJarDB>(), alignment: align_of::<SoupCookieJarDB>()}),
-    ("SoupCookieJarDBClass", Layout {size: size_of::<SoupCookieJarDBClass>(), alignment: align_of::<SoupCookieJarDBClass>()}),
-    ("SoupCookieJarText", Layout {size: size_of::<SoupCookieJarText>(), alignment: align_of::<SoupCookieJarText>()}),
-    ("SoupCookieJarTextClass", Layout {size: size_of::<SoupCookieJarTextClass>(), alignment: align_of::<SoupCookieJarTextClass>()}),
-    ("SoupDate", Layout {size: size_of::<SoupDate>(), alignment: align_of::<SoupDate>()}),
-    ("SoupDateFormat", Layout {size: size_of::<SoupDateFormat>(), alignment: align_of::<SoupDateFormat>()}),
-    ("SoupEncoding", Layout {size: size_of::<SoupEncoding>(), alignment: align_of::<SoupEncoding>()}),
-    ("SoupExpectation", Layout {size: size_of::<SoupExpectation>(), alignment: align_of::<SoupExpectation>()}),
-    ("SoupHSTSEnforcer", Layout {size: size_of::<SoupHSTSEnforcer>(), alignment: align_of::<SoupHSTSEnforcer>()}),
-    ("SoupHSTSEnforcerClass", Layout {size: size_of::<SoupHSTSEnforcerClass>(), alignment: align_of::<SoupHSTSEnforcerClass>()}),
-    ("SoupHSTSEnforcerDB", Layout {size: size_of::<SoupHSTSEnforcerDB>(), alignment: align_of::<SoupHSTSEnforcerDB>()}),
-    ("SoupHSTSEnforcerDBClass", Layout {size: size_of::<SoupHSTSEnforcerDBClass>(), alignment: align_of::<SoupHSTSEnforcerDBClass>()}),
-    ("SoupHSTSPolicy", Layout {size: size_of::<SoupHSTSPolicy>(), alignment: align_of::<SoupHSTSPolicy>()}),
-    ("SoupHTTPVersion", Layout {size: size_of::<SoupHTTPVersion>(), alignment: align_of::<SoupHTTPVersion>()}),
-    ("SoupKnownStatusCode", Layout {size: size_of::<SoupKnownStatusCode>(), alignment: align_of::<SoupKnownStatusCode>()}),
-    ("SoupLogger", Layout {size: size_of::<SoupLogger>(), alignment: align_of::<SoupLogger>()}),
-    ("SoupLoggerClass", Layout {size: size_of::<SoupLoggerClass>(), alignment: align_of::<SoupLoggerClass>()}),
-    ("SoupLoggerLogLevel", Layout {size: size_of::<SoupLoggerLogLevel>(), alignment: align_of::<SoupLoggerLogLevel>()}),
-    ("SoupMemoryUse", Layout {size: size_of::<SoupMemoryUse>(), alignment: align_of::<SoupMemoryUse>()}),
-    ("SoupMessage", Layout {size: size_of::<SoupMessage>(), alignment: align_of::<SoupMessage>()}),
-    ("SoupMessageBody", Layout {size: size_of::<SoupMessageBody>(), alignment: align_of::<SoupMessageBody>()}),
-    ("SoupMessageClass", Layout {size: size_of::<SoupMessageClass>(), alignment: align_of::<SoupMessageClass>()}),
-    ("SoupMessageFlags", Layout {size: size_of::<SoupMessageFlags>(), alignment: align_of::<SoupMessageFlags>()}),
-    ("SoupMessageHeadersIter", Layout {size: size_of::<SoupMessageHeadersIter>(), alignment: align_of::<SoupMessageHeadersIter>()}),
-    ("SoupMessageHeadersType", Layout {size: size_of::<SoupMessageHeadersType>(), alignment: align_of::<SoupMessageHeadersType>()}),
-    ("SoupMessagePriority", Layout {size: size_of::<SoupMessagePriority>(), alignment: align_of::<SoupMessagePriority>()}),
-    ("SoupMultipartInputStream", Layout {size: size_of::<SoupMultipartInputStream>(), alignment: align_of::<SoupMultipartInputStream>()}),
-    ("SoupMultipartInputStreamClass", Layout {size: size_of::<SoupMultipartInputStreamClass>(), alignment: align_of::<SoupMultipartInputStreamClass>()}),
-    ("SoupPasswordManagerInterface", Layout {size: size_of::<SoupPasswordManagerInterface>(), alignment: align_of::<SoupPasswordManagerInterface>()}),
-    ("SoupProxyResolverDefault", Layout {size: size_of::<SoupProxyResolverDefault>(), alignment: align_of::<SoupProxyResolverDefault>()}),
-    ("SoupProxyResolverDefaultClass", Layout {size: size_of::<SoupProxyResolverDefaultClass>(), alignment: align_of::<SoupProxyResolverDefaultClass>()}),
-    ("SoupProxyResolverInterface", Layout {size: size_of::<SoupProxyResolverInterface>(), alignment: align_of::<SoupProxyResolverInterface>()}),
-    ("SoupProxyURIResolverInterface", Layout {size: size_of::<SoupProxyURIResolverInterface>(), alignment: align_of::<SoupProxyURIResolverInterface>()}),
-    ("SoupRange", Layout {size: size_of::<SoupRange>(), alignment: align_of::<SoupRange>()}),
-    ("SoupRequest", Layout {size: size_of::<SoupRequest>(), alignment: align_of::<SoupRequest>()}),
-    ("SoupRequestClass", Layout {size: size_of::<SoupRequestClass>(), alignment: align_of::<SoupRequestClass>()}),
-    ("SoupRequestData", Layout {size: size_of::<SoupRequestData>(), alignment: align_of::<SoupRequestData>()}),
-    ("SoupRequestDataClass", Layout {size: size_of::<SoupRequestDataClass>(), alignment: align_of::<SoupRequestDataClass>()}),
-    ("SoupRequestError", Layout {size: size_of::<SoupRequestError>(), alignment: align_of::<SoupRequestError>()}),
-    ("SoupRequestFile", Layout {size: size_of::<SoupRequestFile>(), alignment: align_of::<SoupRequestFile>()}),
-    ("SoupRequestFileClass", Layout {size: size_of::<SoupRequestFileClass>(), alignment: align_of::<SoupRequestFileClass>()}),
-    ("SoupRequestHTTP", Layout {size: size_of::<SoupRequestHTTP>(), alignment: align_of::<SoupRequestHTTP>()}),
-    ("SoupRequestHTTPClass", Layout {size: size_of::<SoupRequestHTTPClass>(), alignment: align_of::<SoupRequestHTTPClass>()}),
-    ("SoupRequester", Layout {size: size_of::<SoupRequester>(), alignment: align_of::<SoupRequester>()}),
-    ("SoupRequesterClass", Layout {size: size_of::<SoupRequesterClass>(), alignment: align_of::<SoupRequesterClass>()}),
-    ("SoupRequesterError", Layout {size: size_of::<SoupRequesterError>(), alignment: align_of::<SoupRequesterError>()}),
-    ("SoupSameSitePolicy", Layout {size: size_of::<SoupSameSitePolicy>(), alignment: align_of::<SoupSameSitePolicy>()}),
-    ("SoupServer", Layout {size: size_of::<SoupServer>(), alignment: align_of::<SoupServer>()}),
-    ("SoupServerClass", Layout {size: size_of::<SoupServerClass>(), alignment: align_of::<SoupServerClass>()}),
-    ("SoupServerListenOptions", Layout {size: size_of::<SoupServerListenOptions>(), alignment: align_of::<SoupServerListenOptions>()}),
-    ("SoupSession", Layout {size: size_of::<SoupSession>(), alignment: align_of::<SoupSession>()}),
-    ("SoupSessionAsync", Layout {size: size_of::<SoupSessionAsync>(), alignment: align_of::<SoupSessionAsync>()}),
-    ("SoupSessionAsyncClass", Layout {size: size_of::<SoupSessionAsyncClass>(), alignment: align_of::<SoupSessionAsyncClass>()}),
-    ("SoupSessionClass", Layout {size: size_of::<SoupSessionClass>(), alignment: align_of::<SoupSessionClass>()}),
-    ("SoupSessionFeatureInterface", Layout {size: size_of::<SoupSessionFeatureInterface>(), alignment: align_of::<SoupSessionFeatureInterface>()}),
-    ("SoupSessionSync", Layout {size: size_of::<SoupSessionSync>(), alignment: align_of::<SoupSessionSync>()}),
-    ("SoupSessionSyncClass", Layout {size: size_of::<SoupSessionSyncClass>(), alignment: align_of::<SoupSessionSyncClass>()}),
-    ("SoupSocket", Layout {size: size_of::<SoupSocket>(), alignment: align_of::<SoupSocket>()}),
-    ("SoupSocketClass", Layout {size: size_of::<SoupSocketClass>(), alignment: align_of::<SoupSocketClass>()}),
-    ("SoupSocketIOStatus", Layout {size: size_of::<SoupSocketIOStatus>(), alignment: align_of::<SoupSocketIOStatus>()}),
-    ("SoupStatus", Layout {size: size_of::<SoupStatus>(), alignment: align_of::<SoupStatus>()}),
-    ("SoupTLDError", Layout {size: size_of::<SoupTLDError>(), alignment: align_of::<SoupTLDError>()}),
-    ("SoupURI", Layout {size: size_of::<SoupURI>(), alignment: align_of::<SoupURI>()}),
-    ("SoupWebsocketCloseCode", Layout {size: size_of::<SoupWebsocketCloseCode>(), alignment: align_of::<SoupWebsocketCloseCode>()}),
-    ("SoupWebsocketConnection", Layout {size: size_of::<SoupWebsocketConnection>(), alignment: align_of::<SoupWebsocketConnection>()}),
-    ("SoupWebsocketConnectionClass", Layout {size: size_of::<SoupWebsocketConnectionClass>(), alignment: align_of::<SoupWebsocketConnectionClass>()}),
-    ("SoupWebsocketConnectionType", Layout {size: size_of::<SoupWebsocketConnectionType>(), alignment: align_of::<SoupWebsocketConnectionType>()}),
-    ("SoupWebsocketDataType", Layout {size: size_of::<SoupWebsocketDataType>(), alignment: align_of::<SoupWebsocketDataType>()}),
-    ("SoupWebsocketError", Layout {size: size_of::<SoupWebsocketError>(), alignment: align_of::<SoupWebsocketError>()}),
-    ("SoupWebsocketExtension", Layout {size: size_of::<SoupWebsocketExtension>(), alignment: align_of::<SoupWebsocketExtension>()}),
-    ("SoupWebsocketExtensionClass", Layout {size: size_of::<SoupWebsocketExtensionClass>(), alignment: align_of::<SoupWebsocketExtensionClass>()}),
-    ("SoupWebsocketExtensionDeflate", Layout {size: size_of::<SoupWebsocketExtensionDeflate>(), alignment: align_of::<SoupWebsocketExtensionDeflate>()}),
-    ("SoupWebsocketExtensionDeflateClass", Layout {size: size_of::<SoupWebsocketExtensionDeflateClass>(), alignment: align_of::<SoupWebsocketExtensionDeflateClass>()}),
-    ("SoupWebsocketExtensionManager", Layout {size: size_of::<SoupWebsocketExtensionManager>(), alignment: align_of::<SoupWebsocketExtensionManager>()}),
-    ("SoupWebsocketExtensionManagerClass", Layout {size: size_of::<SoupWebsocketExtensionManagerClass>(), alignment: align_of::<SoupWebsocketExtensionManagerClass>()}),
-    ("SoupWebsocketState", Layout {size: size_of::<SoupWebsocketState>(), alignment: align_of::<SoupWebsocketState>()}),
-    ("SoupXMLRPCError", Layout {size: size_of::<SoupXMLRPCError>(), alignment: align_of::<SoupXMLRPCError>()}),
-    ("SoupXMLRPCFault", Layout {size: size_of::<SoupXMLRPCFault>(), alignment: align_of::<SoupXMLRPCFault>()}),
+    (
+        "SoupAddress",
+        Layout {
+            size: size_of::<SoupAddress>(),
+            alignment: align_of::<SoupAddress>(),
+        },
+    ),
+    (
+        "SoupAddressClass",
+        Layout {
+            size: size_of::<SoupAddressClass>(),
+            alignment: align_of::<SoupAddressClass>(),
+        },
+    ),
+    (
+        "SoupAddressFamily",
+        Layout {
+            size: size_of::<SoupAddressFamily>(),
+            alignment: align_of::<SoupAddressFamily>(),
+        },
+    ),
+    (
+        "SoupAuth",
+        Layout {
+            size: size_of::<SoupAuth>(),
+            alignment: align_of::<SoupAuth>(),
+        },
+    ),
+    (
+        "SoupAuthClass",
+        Layout {
+            size: size_of::<SoupAuthClass>(),
+            alignment: align_of::<SoupAuthClass>(),
+        },
+    ),
+    (
+        "SoupAuthDomain",
+        Layout {
+            size: size_of::<SoupAuthDomain>(),
+            alignment: align_of::<SoupAuthDomain>(),
+        },
+    ),
+    (
+        "SoupAuthDomainBasic",
+        Layout {
+            size: size_of::<SoupAuthDomainBasic>(),
+            alignment: align_of::<SoupAuthDomainBasic>(),
+        },
+    ),
+    (
+        "SoupAuthDomainBasicClass",
+        Layout {
+            size: size_of::<SoupAuthDomainBasicClass>(),
+            alignment: align_of::<SoupAuthDomainBasicClass>(),
+        },
+    ),
+    (
+        "SoupAuthDomainClass",
+        Layout {
+            size: size_of::<SoupAuthDomainClass>(),
+            alignment: align_of::<SoupAuthDomainClass>(),
+        },
+    ),
+    (
+        "SoupAuthDomainDigest",
+        Layout {
+            size: size_of::<SoupAuthDomainDigest>(),
+            alignment: align_of::<SoupAuthDomainDigest>(),
+        },
+    ),
+    (
+        "SoupAuthDomainDigestClass",
+        Layout {
+            size: size_of::<SoupAuthDomainDigestClass>(),
+            alignment: align_of::<SoupAuthDomainDigestClass>(),
+        },
+    ),
+    (
+        "SoupAuthManager",
+        Layout {
+            size: size_of::<SoupAuthManager>(),
+            alignment: align_of::<SoupAuthManager>(),
+        },
+    ),
+    (
+        "SoupAuthManagerClass",
+        Layout {
+            size: size_of::<SoupAuthManagerClass>(),
+            alignment: align_of::<SoupAuthManagerClass>(),
+        },
+    ),
+    (
+        "SoupBuffer",
+        Layout {
+            size: size_of::<SoupBuffer>(),
+            alignment: align_of::<SoupBuffer>(),
+        },
+    ),
+    (
+        "SoupCache",
+        Layout {
+            size: size_of::<SoupCache>(),
+            alignment: align_of::<SoupCache>(),
+        },
+    ),
+    (
+        "SoupCacheClass",
+        Layout {
+            size: size_of::<SoupCacheClass>(),
+            alignment: align_of::<SoupCacheClass>(),
+        },
+    ),
+    (
+        "SoupCacheResponse",
+        Layout {
+            size: size_of::<SoupCacheResponse>(),
+            alignment: align_of::<SoupCacheResponse>(),
+        },
+    ),
+    (
+        "SoupCacheType",
+        Layout {
+            size: size_of::<SoupCacheType>(),
+            alignment: align_of::<SoupCacheType>(),
+        },
+    ),
+    (
+        "SoupCacheability",
+        Layout {
+            size: size_of::<SoupCacheability>(),
+            alignment: align_of::<SoupCacheability>(),
+        },
+    ),
+    (
+        "SoupConnectionState",
+        Layout {
+            size: size_of::<SoupConnectionState>(),
+            alignment: align_of::<SoupConnectionState>(),
+        },
+    ),
+    (
+        "SoupContentDecoder",
+        Layout {
+            size: size_of::<SoupContentDecoder>(),
+            alignment: align_of::<SoupContentDecoder>(),
+        },
+    ),
+    (
+        "SoupContentDecoderClass",
+        Layout {
+            size: size_of::<SoupContentDecoderClass>(),
+            alignment: align_of::<SoupContentDecoderClass>(),
+        },
+    ),
+    (
+        "SoupContentSniffer",
+        Layout {
+            size: size_of::<SoupContentSniffer>(),
+            alignment: align_of::<SoupContentSniffer>(),
+        },
+    ),
+    (
+        "SoupContentSnifferClass",
+        Layout {
+            size: size_of::<SoupContentSnifferClass>(),
+            alignment: align_of::<SoupContentSnifferClass>(),
+        },
+    ),
+    (
+        "SoupCookie",
+        Layout {
+            size: size_of::<SoupCookie>(),
+            alignment: align_of::<SoupCookie>(),
+        },
+    ),
+    (
+        "SoupCookieJar",
+        Layout {
+            size: size_of::<SoupCookieJar>(),
+            alignment: align_of::<SoupCookieJar>(),
+        },
+    ),
+    (
+        "SoupCookieJarAcceptPolicy",
+        Layout {
+            size: size_of::<SoupCookieJarAcceptPolicy>(),
+            alignment: align_of::<SoupCookieJarAcceptPolicy>(),
+        },
+    ),
+    (
+        "SoupCookieJarClass",
+        Layout {
+            size: size_of::<SoupCookieJarClass>(),
+            alignment: align_of::<SoupCookieJarClass>(),
+        },
+    ),
+    (
+        "SoupCookieJarDB",
+        Layout {
+            size: size_of::<SoupCookieJarDB>(),
+            alignment: align_of::<SoupCookieJarDB>(),
+        },
+    ),
+    (
+        "SoupCookieJarDBClass",
+        Layout {
+            size: size_of::<SoupCookieJarDBClass>(),
+            alignment: align_of::<SoupCookieJarDBClass>(),
+        },
+    ),
+    (
+        "SoupCookieJarText",
+        Layout {
+            size: size_of::<SoupCookieJarText>(),
+            alignment: align_of::<SoupCookieJarText>(),
+        },
+    ),
+    (
+        "SoupCookieJarTextClass",
+        Layout {
+            size: size_of::<SoupCookieJarTextClass>(),
+            alignment: align_of::<SoupCookieJarTextClass>(),
+        },
+    ),
+    (
+        "SoupDate",
+        Layout {
+            size: size_of::<SoupDate>(),
+            alignment: align_of::<SoupDate>(),
+        },
+    ),
+    (
+        "SoupDateFormat",
+        Layout {
+            size: size_of::<SoupDateFormat>(),
+            alignment: align_of::<SoupDateFormat>(),
+        },
+    ),
+    (
+        "SoupEncoding",
+        Layout {
+            size: size_of::<SoupEncoding>(),
+            alignment: align_of::<SoupEncoding>(),
+        },
+    ),
+    (
+        "SoupExpectation",
+        Layout {
+            size: size_of::<SoupExpectation>(),
+            alignment: align_of::<SoupExpectation>(),
+        },
+    ),
+    (
+        "SoupHSTSEnforcer",
+        Layout {
+            size: size_of::<SoupHSTSEnforcer>(),
+            alignment: align_of::<SoupHSTSEnforcer>(),
+        },
+    ),
+    (
+        "SoupHSTSEnforcerClass",
+        Layout {
+            size: size_of::<SoupHSTSEnforcerClass>(),
+            alignment: align_of::<SoupHSTSEnforcerClass>(),
+        },
+    ),
+    (
+        "SoupHSTSEnforcerDB",
+        Layout {
+            size: size_of::<SoupHSTSEnforcerDB>(),
+            alignment: align_of::<SoupHSTSEnforcerDB>(),
+        },
+    ),
+    (
+        "SoupHSTSEnforcerDBClass",
+        Layout {
+            size: size_of::<SoupHSTSEnforcerDBClass>(),
+            alignment: align_of::<SoupHSTSEnforcerDBClass>(),
+        },
+    ),
+    (
+        "SoupHSTSPolicy",
+        Layout {
+            size: size_of::<SoupHSTSPolicy>(),
+            alignment: align_of::<SoupHSTSPolicy>(),
+        },
+    ),
+    (
+        "SoupHTTPVersion",
+        Layout {
+            size: size_of::<SoupHTTPVersion>(),
+            alignment: align_of::<SoupHTTPVersion>(),
+        },
+    ),
+    (
+        "SoupKnownStatusCode",
+        Layout {
+            size: size_of::<SoupKnownStatusCode>(),
+            alignment: align_of::<SoupKnownStatusCode>(),
+        },
+    ),
+    (
+        "SoupLogger",
+        Layout {
+            size: size_of::<SoupLogger>(),
+            alignment: align_of::<SoupLogger>(),
+        },
+    ),
+    (
+        "SoupLoggerClass",
+        Layout {
+            size: size_of::<SoupLoggerClass>(),
+            alignment: align_of::<SoupLoggerClass>(),
+        },
+    ),
+    (
+        "SoupLoggerLogLevel",
+        Layout {
+            size: size_of::<SoupLoggerLogLevel>(),
+            alignment: align_of::<SoupLoggerLogLevel>(),
+        },
+    ),
+    (
+        "SoupMemoryUse",
+        Layout {
+            size: size_of::<SoupMemoryUse>(),
+            alignment: align_of::<SoupMemoryUse>(),
+        },
+    ),
+    (
+        "SoupMessage",
+        Layout {
+            size: size_of::<SoupMessage>(),
+            alignment: align_of::<SoupMessage>(),
+        },
+    ),
+    (
+        "SoupMessageBody",
+        Layout {
+            size: size_of::<SoupMessageBody>(),
+            alignment: align_of::<SoupMessageBody>(),
+        },
+    ),
+    (
+        "SoupMessageClass",
+        Layout {
+            size: size_of::<SoupMessageClass>(),
+            alignment: align_of::<SoupMessageClass>(),
+        },
+    ),
+    (
+        "SoupMessageFlags",
+        Layout {
+            size: size_of::<SoupMessageFlags>(),
+            alignment: align_of::<SoupMessageFlags>(),
+        },
+    ),
+    (
+        "SoupMessageHeadersIter",
+        Layout {
+            size: size_of::<SoupMessageHeadersIter>(),
+            alignment: align_of::<SoupMessageHeadersIter>(),
+        },
+    ),
+    (
+        "SoupMessageHeadersType",
+        Layout {
+            size: size_of::<SoupMessageHeadersType>(),
+            alignment: align_of::<SoupMessageHeadersType>(),
+        },
+    ),
+    (
+        "SoupMessagePriority",
+        Layout {
+            size: size_of::<SoupMessagePriority>(),
+            alignment: align_of::<SoupMessagePriority>(),
+        },
+    ),
+    (
+        "SoupMultipartInputStream",
+        Layout {
+            size: size_of::<SoupMultipartInputStream>(),
+            alignment: align_of::<SoupMultipartInputStream>(),
+        },
+    ),
+    (
+        "SoupMultipartInputStreamClass",
+        Layout {
+            size: size_of::<SoupMultipartInputStreamClass>(),
+            alignment: align_of::<SoupMultipartInputStreamClass>(),
+        },
+    ),
+    (
+        "SoupPasswordManagerInterface",
+        Layout {
+            size: size_of::<SoupPasswordManagerInterface>(),
+            alignment: align_of::<SoupPasswordManagerInterface>(),
+        },
+    ),
+    (
+        "SoupProxyResolverDefault",
+        Layout {
+            size: size_of::<SoupProxyResolverDefault>(),
+            alignment: align_of::<SoupProxyResolverDefault>(),
+        },
+    ),
+    (
+        "SoupProxyResolverDefaultClass",
+        Layout {
+            size: size_of::<SoupProxyResolverDefaultClass>(),
+            alignment: align_of::<SoupProxyResolverDefaultClass>(),
+        },
+    ),
+    (
+        "SoupProxyResolverInterface",
+        Layout {
+            size: size_of::<SoupProxyResolverInterface>(),
+            alignment: align_of::<SoupProxyResolverInterface>(),
+        },
+    ),
+    (
+        "SoupProxyURIResolverInterface",
+        Layout {
+            size: size_of::<SoupProxyURIResolverInterface>(),
+            alignment: align_of::<SoupProxyURIResolverInterface>(),
+        },
+    ),
+    (
+        "SoupRange",
+        Layout {
+            size: size_of::<SoupRange>(),
+            alignment: align_of::<SoupRange>(),
+        },
+    ),
+    (
+        "SoupRequest",
+        Layout {
+            size: size_of::<SoupRequest>(),
+            alignment: align_of::<SoupRequest>(),
+        },
+    ),
+    (
+        "SoupRequestClass",
+        Layout {
+            size: size_of::<SoupRequestClass>(),
+            alignment: align_of::<SoupRequestClass>(),
+        },
+    ),
+    (
+        "SoupRequestData",
+        Layout {
+            size: size_of::<SoupRequestData>(),
+            alignment: align_of::<SoupRequestData>(),
+        },
+    ),
+    (
+        "SoupRequestDataClass",
+        Layout {
+            size: size_of::<SoupRequestDataClass>(),
+            alignment: align_of::<SoupRequestDataClass>(),
+        },
+    ),
+    (
+        "SoupRequestError",
+        Layout {
+            size: size_of::<SoupRequestError>(),
+            alignment: align_of::<SoupRequestError>(),
+        },
+    ),
+    (
+        "SoupRequestFile",
+        Layout {
+            size: size_of::<SoupRequestFile>(),
+            alignment: align_of::<SoupRequestFile>(),
+        },
+    ),
+    (
+        "SoupRequestFileClass",
+        Layout {
+            size: size_of::<SoupRequestFileClass>(),
+            alignment: align_of::<SoupRequestFileClass>(),
+        },
+    ),
+    (
+        "SoupRequestHTTP",
+        Layout {
+            size: size_of::<SoupRequestHTTP>(),
+            alignment: align_of::<SoupRequestHTTP>(),
+        },
+    ),
+    (
+        "SoupRequestHTTPClass",
+        Layout {
+            size: size_of::<SoupRequestHTTPClass>(),
+            alignment: align_of::<SoupRequestHTTPClass>(),
+        },
+    ),
+    (
+        "SoupRequester",
+        Layout {
+            size: size_of::<SoupRequester>(),
+            alignment: align_of::<SoupRequester>(),
+        },
+    ),
+    (
+        "SoupRequesterClass",
+        Layout {
+            size: size_of::<SoupRequesterClass>(),
+            alignment: align_of::<SoupRequesterClass>(),
+        },
+    ),
+    (
+        "SoupRequesterError",
+        Layout {
+            size: size_of::<SoupRequesterError>(),
+            alignment: align_of::<SoupRequesterError>(),
+        },
+    ),
+    (
+        "SoupSameSitePolicy",
+        Layout {
+            size: size_of::<SoupSameSitePolicy>(),
+            alignment: align_of::<SoupSameSitePolicy>(),
+        },
+    ),
+    (
+        "SoupServer",
+        Layout {
+            size: size_of::<SoupServer>(),
+            alignment: align_of::<SoupServer>(),
+        },
+    ),
+    (
+        "SoupServerClass",
+        Layout {
+            size: size_of::<SoupServerClass>(),
+            alignment: align_of::<SoupServerClass>(),
+        },
+    ),
+    (
+        "SoupServerListenOptions",
+        Layout {
+            size: size_of::<SoupServerListenOptions>(),
+            alignment: align_of::<SoupServerListenOptions>(),
+        },
+    ),
+    (
+        "SoupSession",
+        Layout {
+            size: size_of::<SoupSession>(),
+            alignment: align_of::<SoupSession>(),
+        },
+    ),
+    (
+        "SoupSessionAsync",
+        Layout {
+            size: size_of::<SoupSessionAsync>(),
+            alignment: align_of::<SoupSessionAsync>(),
+        },
+    ),
+    (
+        "SoupSessionAsyncClass",
+        Layout {
+            size: size_of::<SoupSessionAsyncClass>(),
+            alignment: align_of::<SoupSessionAsyncClass>(),
+        },
+    ),
+    (
+        "SoupSessionClass",
+        Layout {
+            size: size_of::<SoupSessionClass>(),
+            alignment: align_of::<SoupSessionClass>(),
+        },
+    ),
+    (
+        "SoupSessionFeatureInterface",
+        Layout {
+            size: size_of::<SoupSessionFeatureInterface>(),
+            alignment: align_of::<SoupSessionFeatureInterface>(),
+        },
+    ),
+    (
+        "SoupSessionSync",
+        Layout {
+            size: size_of::<SoupSessionSync>(),
+            alignment: align_of::<SoupSessionSync>(),
+        },
+    ),
+    (
+        "SoupSessionSyncClass",
+        Layout {
+            size: size_of::<SoupSessionSyncClass>(),
+            alignment: align_of::<SoupSessionSyncClass>(),
+        },
+    ),
+    (
+        "SoupSocket",
+        Layout {
+            size: size_of::<SoupSocket>(),
+            alignment: align_of::<SoupSocket>(),
+        },
+    ),
+    (
+        "SoupSocketClass",
+        Layout {
+            size: size_of::<SoupSocketClass>(),
+            alignment: align_of::<SoupSocketClass>(),
+        },
+    ),
+    (
+        "SoupSocketIOStatus",
+        Layout {
+            size: size_of::<SoupSocketIOStatus>(),
+            alignment: align_of::<SoupSocketIOStatus>(),
+        },
+    ),
+    (
+        "SoupStatus",
+        Layout {
+            size: size_of::<SoupStatus>(),
+            alignment: align_of::<SoupStatus>(),
+        },
+    ),
+    (
+        "SoupTLDError",
+        Layout {
+            size: size_of::<SoupTLDError>(),
+            alignment: align_of::<SoupTLDError>(),
+        },
+    ),
+    (
+        "SoupURI",
+        Layout {
+            size: size_of::<SoupURI>(),
+            alignment: align_of::<SoupURI>(),
+        },
+    ),
+    (
+        "SoupWebsocketCloseCode",
+        Layout {
+            size: size_of::<SoupWebsocketCloseCode>(),
+            alignment: align_of::<SoupWebsocketCloseCode>(),
+        },
+    ),
+    (
+        "SoupWebsocketConnection",
+        Layout {
+            size: size_of::<SoupWebsocketConnection>(),
+            alignment: align_of::<SoupWebsocketConnection>(),
+        },
+    ),
+    (
+        "SoupWebsocketConnectionClass",
+        Layout {
+            size: size_of::<SoupWebsocketConnectionClass>(),
+            alignment: align_of::<SoupWebsocketConnectionClass>(),
+        },
+    ),
+    (
+        "SoupWebsocketConnectionType",
+        Layout {
+            size: size_of::<SoupWebsocketConnectionType>(),
+            alignment: align_of::<SoupWebsocketConnectionType>(),
+        },
+    ),
+    (
+        "SoupWebsocketDataType",
+        Layout {
+            size: size_of::<SoupWebsocketDataType>(),
+            alignment: align_of::<SoupWebsocketDataType>(),
+        },
+    ),
+    (
+        "SoupWebsocketError",
+        Layout {
+            size: size_of::<SoupWebsocketError>(),
+            alignment: align_of::<SoupWebsocketError>(),
+        },
+    ),
+    (
+        "SoupWebsocketExtension",
+        Layout {
+            size: size_of::<SoupWebsocketExtension>(),
+            alignment: align_of::<SoupWebsocketExtension>(),
+        },
+    ),
+    (
+        "SoupWebsocketExtensionClass",
+        Layout {
+            size: size_of::<SoupWebsocketExtensionClass>(),
+            alignment: align_of::<SoupWebsocketExtensionClass>(),
+        },
+    ),
+    (
+        "SoupWebsocketExtensionDeflate",
+        Layout {
+            size: size_of::<SoupWebsocketExtensionDeflate>(),
+            alignment: align_of::<SoupWebsocketExtensionDeflate>(),
+        },
+    ),
+    (
+        "SoupWebsocketExtensionDeflateClass",
+        Layout {
+            size: size_of::<SoupWebsocketExtensionDeflateClass>(),
+            alignment: align_of::<SoupWebsocketExtensionDeflateClass>(),
+        },
+    ),
+    (
+        "SoupWebsocketExtensionManager",
+        Layout {
+            size: size_of::<SoupWebsocketExtensionManager>(),
+            alignment: align_of::<SoupWebsocketExtensionManager>(),
+        },
+    ),
+    (
+        "SoupWebsocketExtensionManagerClass",
+        Layout {
+            size: size_of::<SoupWebsocketExtensionManagerClass>(),
+            alignment: align_of::<SoupWebsocketExtensionManagerClass>(),
+        },
+    ),
+    (
+        "SoupWebsocketState",
+        Layout {
+            size: size_of::<SoupWebsocketState>(),
+            alignment: align_of::<SoupWebsocketState>(),
+        },
+    ),
+    (
+        "SoupXMLRPCError",
+        Layout {
+            size: size_of::<SoupXMLRPCError>(),
+            alignment: align_of::<SoupXMLRPCError>(),
+        },
+    ),
+    (
+        "SoupXMLRPCFault",
+        Layout {
+            size: size_of::<SoupXMLRPCFault>(),
+            alignment: align_of::<SoupXMLRPCFault>(),
+        },
+    ),
 ];
 
 const RUST_CONSTANTS: &[(&str, &str)] = &[
@@ -365,7 +1014,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("SOUP_AUTH_DOMAIN_DIGEST_AUTH_DATA", "auth-data"),
     ("SOUP_AUTH_DOMAIN_FILTER", "filter"),
     ("SOUP_AUTH_DOMAIN_FILTER_DATA", "filter-data"),
-    ("SOUP_AUTH_DOMAIN_GENERIC_AUTH_CALLBACK", "generic-auth-callback"),
+    (
+        "SOUP_AUTH_DOMAIN_GENERIC_AUTH_CALLBACK",
+        "generic-auth-callback",
+    ),
     ("SOUP_AUTH_DOMAIN_GENERIC_AUTH_DATA", "generic-auth-data"),
     ("SOUP_AUTH_DOMAIN_PROXY", "proxy"),
     ("SOUP_AUTH_DOMAIN_REALM", "realm"),
@@ -422,7 +1074,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(guint) SOUP_EXPECTATION_CONTINUE", "2"),
     ("(guint) SOUP_EXPECTATION_UNRECOGNIZED", "1"),
     ("SOUP_FORM_MIME_TYPE_MULTIPART", "multipart/form-data"),
-    ("SOUP_FORM_MIME_TYPE_URLENCODED", "application/x-www-form-urlencoded"),
+    (
+        "SOUP_FORM_MIME_TYPE_URLENCODED",
+        "application/x-www-form-urlencoded",
+    ),
     ("SOUP_HSTS_ENFORCER_DB_FILENAME", "filename"),
     ("SOUP_HSTS_POLICY_MAX_AGE_PAST", "0"),
     ("(gint) SOUP_HTTP_1_0", "0"),
@@ -444,7 +1099,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(gint) SOUP_KNOWN_STATUS_CODE_FOUND", "302"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_GATEWAY_TIMEOUT", "504"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_GONE", "410"),
-    ("(gint) SOUP_KNOWN_STATUS_CODE_HTTP_VERSION_NOT_SUPPORTED", "505"),
+    (
+        "(gint) SOUP_KNOWN_STATUS_CODE_HTTP_VERSION_NOT_SUPPORTED",
+        "505",
+    ),
     ("(gint) SOUP_KNOWN_STATUS_CODE_INSUFFICIENT_STORAGE", "507"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_INTERNAL_SERVER_ERROR", "500"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_INVALID_RANGE", "416"),
@@ -460,7 +1118,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(gint) SOUP_KNOWN_STATUS_CODE_NONE", "0"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_NON_AUTHORITATIVE", "203"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_NOT_ACCEPTABLE", "406"),
-    ("(gint) SOUP_KNOWN_STATUS_CODE_NOT_APPEARING_IN_THIS_PROTOCOL", "306"),
+    (
+        "(gint) SOUP_KNOWN_STATUS_CODE_NOT_APPEARING_IN_THIS_PROTOCOL",
+        "306",
+    ),
     ("(gint) SOUP_KNOWN_STATUS_CODE_NOT_EXTENDED", "510"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_NOT_FOUND", "404"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_NOT_IMPLEMENTED", "501"),
@@ -471,10 +1132,19 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(gint) SOUP_KNOWN_STATUS_CODE_PAYMENT_REQUIRED", "402"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_PRECONDITION_FAILED", "412"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_PROCESSING", "102"),
-    ("(gint) SOUP_KNOWN_STATUS_CODE_PROXY_AUTHENTICATION_REQUIRED", "407"),
+    (
+        "(gint) SOUP_KNOWN_STATUS_CODE_PROXY_AUTHENTICATION_REQUIRED",
+        "407",
+    ),
     ("(gint) SOUP_KNOWN_STATUS_CODE_PROXY_UNAUTHORIZED", "407"),
-    ("(gint) SOUP_KNOWN_STATUS_CODE_REQUESTED_RANGE_NOT_SATISFIABLE", "416"),
-    ("(gint) SOUP_KNOWN_STATUS_CODE_REQUEST_ENTITY_TOO_LARGE", "413"),
+    (
+        "(gint) SOUP_KNOWN_STATUS_CODE_REQUESTED_RANGE_NOT_SATISFIABLE",
+        "416",
+    ),
+    (
+        "(gint) SOUP_KNOWN_STATUS_CODE_REQUEST_ENTITY_TOO_LARGE",
+        "413",
+    ),
     ("(gint) SOUP_KNOWN_STATUS_CODE_REQUEST_TIMEOUT", "408"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_REQUEST_URI_TOO_LONG", "414"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_RESET_CONTENT", "205"),
@@ -488,7 +1158,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(gint) SOUP_KNOWN_STATUS_CODE_TRY_AGAIN", "9"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_UNAUTHORIZED", "401"),
     ("(gint) SOUP_KNOWN_STATUS_CODE_UNPROCESSABLE_ENTITY", "422"),
-    ("(gint) SOUP_KNOWN_STATUS_CODE_UNSUPPORTED_MEDIA_TYPE", "415"),
+    (
+        "(gint) SOUP_KNOWN_STATUS_CODE_UNSUPPORTED_MEDIA_TYPE",
+        "415",
+    ),
     ("(gint) SOUP_KNOWN_STATUS_CODE_USE_PROXY", "305"),
     ("SOUP_LOGGER_LEVEL", "level"),
     ("(gint) SOUP_LOGGER_LOG_BODY", "3"),
@@ -513,7 +1186,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("SOUP_MESSAGE_HTTP_VERSION", "http-version"),
     ("(guint) SOUP_MESSAGE_IDEMPOTENT", "128"),
     ("(guint) SOUP_MESSAGE_IGNORE_CONNECTION_LIMITS", "256"),
-    ("SOUP_MESSAGE_IS_TOP_LEVEL_NAVIGATION", "is-top-level-navigation"),
+    (
+        "SOUP_MESSAGE_IS_TOP_LEVEL_NAVIGATION",
+        "is-top-level-navigation",
+    ),
     ("SOUP_MESSAGE_METHOD", "method"),
     ("(guint) SOUP_MESSAGE_NEW_CONNECTION", "64"),
     ("(guint) SOUP_MESSAGE_NO_REDIRECT", "2"),
@@ -548,7 +1224,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(gint) SOUP_SAME_SITE_POLICY_LAX", "1"),
     ("(gint) SOUP_SAME_SITE_POLICY_NONE", "0"),
     ("(gint) SOUP_SAME_SITE_POLICY_STRICT", "2"),
-    ("SOUP_SERVER_ADD_WEBSOCKET_EXTENSION", "add-websocket-extension"),
+    (
+        "SOUP_SERVER_ADD_WEBSOCKET_EXTENSION",
+        "add-websocket-extension",
+    ),
     ("SOUP_SERVER_ASYNC_CONTEXT", "async-context"),
     ("SOUP_SERVER_HTTPS_ALIASES", "https-aliases"),
     ("SOUP_SERVER_HTTP_ALIASES", "http-aliases"),
@@ -558,7 +1237,10 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(guint) SOUP_SERVER_LISTEN_IPV6_ONLY", "4"),
     ("SOUP_SERVER_PORT", "port"),
     ("SOUP_SERVER_RAW_PATHS", "raw-paths"),
-    ("SOUP_SERVER_REMOVE_WEBSOCKET_EXTENSION", "remove-websocket-extension"),
+    (
+        "SOUP_SERVER_REMOVE_WEBSOCKET_EXTENSION",
+        "remove-websocket-extension",
+    ),
     ("SOUP_SERVER_SERVER_HEADER", "server-header"),
     ("SOUP_SERVER_SSL_CERT_FILE", "ssl-cert-file"),
     ("SOUP_SERVER_SSL_KEY_FILE", "ssl-key-file"),
@@ -576,10 +1258,16 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("SOUP_SESSION_MAX_CONNS_PER_HOST", "max-conns-per-host"),
     ("SOUP_SESSION_PROXY_RESOLVER", "proxy-resolver"),
     ("SOUP_SESSION_PROXY_URI", "proxy-uri"),
-    ("SOUP_SESSION_REMOVE_FEATURE_BY_TYPE", "remove-feature-by-type"),
+    (
+        "SOUP_SESSION_REMOVE_FEATURE_BY_TYPE",
+        "remove-feature-by-type",
+    ),
     ("SOUP_SESSION_SSL_CA_FILE", "ssl-ca-file"),
     ("SOUP_SESSION_SSL_STRICT", "ssl-strict"),
-    ("SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE", "ssl-use-system-ca-file"),
+    (
+        "SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE",
+        "ssl-use-system-ca-file",
+    ),
     ("SOUP_SESSION_TIMEOUT", "timeout"),
     ("SOUP_SESSION_TLS_DATABASE", "tls-database"),
     ("SOUP_SESSION_TLS_INTERACTION", "tls-interaction"),
@@ -698,15 +1386,34 @@ const RUST_CONSTANTS: &[(&str, &str)] = &[
     ("(gint) SOUP_XMLRPC_ERROR_ARGUMENTS", "0"),
     ("(gint) SOUP_XMLRPC_ERROR_RETVAL", "1"),
     ("(gint) SOUP_XMLRPC_FAULT_APPLICATION_ERROR", "-32500"),
-    ("(gint) SOUP_XMLRPC_FAULT_PARSE_ERROR_INVALID_CHARACTER_FOR_ENCODING", "-32702"),
-    ("(gint) SOUP_XMLRPC_FAULT_PARSE_ERROR_NOT_WELL_FORMED", "-32700"),
-    ("(gint) SOUP_XMLRPC_FAULT_PARSE_ERROR_UNSUPPORTED_ENCODING", "-32701"),
-    ("(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_INTERNAL_XML_RPC_ERROR", "-32603"),
-    ("(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_INVALID_METHOD_PARAMETERS", "-32602"),
-    ("(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_INVALID_XML_RPC", "-32600"),
-    ("(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_REQUESTED_METHOD_NOT_FOUND", "-32601"),
+    (
+        "(gint) SOUP_XMLRPC_FAULT_PARSE_ERROR_INVALID_CHARACTER_FOR_ENCODING",
+        "-32702",
+    ),
+    (
+        "(gint) SOUP_XMLRPC_FAULT_PARSE_ERROR_NOT_WELL_FORMED",
+        "-32700",
+    ),
+    (
+        "(gint) SOUP_XMLRPC_FAULT_PARSE_ERROR_UNSUPPORTED_ENCODING",
+        "-32701",
+    ),
+    (
+        "(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_INTERNAL_XML_RPC_ERROR",
+        "-32603",
+    ),
+    (
+        "(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_INVALID_METHOD_PARAMETERS",
+        "-32602",
+    ),
+    (
+        "(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_INVALID_XML_RPC",
+        "-32600",
+    ),
+    (
+        "(gint) SOUP_XMLRPC_FAULT_SERVER_ERROR_REQUESTED_METHOD_NOT_FOUND",
+        "-32601",
+    ),
     ("(gint) SOUP_XMLRPC_FAULT_SYSTEM_ERROR", "-32400"),
     ("(gint) SOUP_XMLRPC_FAULT_TRANSPORT_ERROR", "-32300"),
 ];
-
-

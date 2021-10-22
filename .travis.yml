@@ -1,8 +1,12 @@
+dist: xenial
 language: rust
 rust:
   - nightly
   - beta
   - stable
+env:
+  - GTK=3.4
+  - GTK=3.18
 addons:
   apt:
     packages:
